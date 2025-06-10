@@ -1,5 +1,6 @@
 provider "aws" {
   region = "us-east-1" # ACM for CloudFront must be in us-east-1
+  profile = "eovictor-admin"
 }
 
 # S3 Bucket for React App - Basic configuration
@@ -63,18 +64,26 @@ resource "aws_acm_certificate" "cert" {
   }
 }
 
-# DNS validation record
+# Use for_each to handle the domain validation options
 resource "aws_route53_record" "cert_validation" {
-  name    = aws_acm_certificate.cert.domain_validation_options[0].resource_record_name
-  type    = aws_acm_certificate.cert.domain_validation_options[0].resource_record_type
+  for_each = {
+    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  name    = each.value.name
+  type    = each.value.type
   zone_id = data.aws_route53_zone.selected.id
-  records = [aws_acm_certificate.cert.domain_validation_options[0].resource_record_value]
+  records = [each.value.record]
   ttl     = 60
 }
 
 resource "aws_acm_certificate_validation" "cert_validated" {
   certificate_arn         = aws_acm_certificate.cert.arn
-  validation_record_fqdns = [aws_route53_record.cert_validation.fqdn]
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
 # CloudFront Distribution
@@ -84,7 +93,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   default_root_object = "index.html"
 
   origin {
-    domain_name = aws_s3_bucket.react_app.website_endpoint
+    domain_name = aws_s3_bucket.react_app.bucket_regional_domain_name
     origin_id   = "reactS3Origin"
 
     custom_origin_config {
@@ -111,6 +120,12 @@ resource "aws_cloudfront_distribution" "cdn" {
     min_ttl     = 0
     default_ttl = 86400    # 24 hours
     max_ttl     = 31536000 # 1 year
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
   }
 
   # Custom error response for SPA routing
