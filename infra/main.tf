@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1" # ACM for CloudFront must be in us-east-1
+  region  = "us-east-1" # ACM for CloudFront must be in us-east-1
   profile = "eovictor-admin"
 }
 
@@ -144,8 +144,8 @@ resource "aws_cloudfront_distribution" "cdn" {
   price_class = "PriceClass_100"
 
   viewer_certificate {
-    acm_certificate_arn = aws_acm_certificate_validation.cert_validated.certificate_arn
-    ssl_support_method  = "sni-only"
+    acm_certificate_arn      = aws_acm_certificate_validation.cert_validated.certificate_arn
+    ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021" # Latest recommended TLS version
   }
 
